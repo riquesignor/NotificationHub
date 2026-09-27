@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using NotificationService.Application.DTOs;
 using NotificationService.Domain.Entities;
 using NotificationService.Domain.Repositories;
+using DomainNotification = NotificationService.Domain.Entities.Notification;
 
 namespace NotificationService.Application.Services;
 
@@ -22,7 +23,7 @@ public class PushNotificationService : IPushNotificationService
         _logger = logger;
     }
 
-    public async Task<SendResult> SendAsync(Notification notification)
+    public async Task<SendResult> SendAsync(DomainNotification notification)
     {
         try
         {

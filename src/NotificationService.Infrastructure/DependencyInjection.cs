@@ -2,6 +2,7 @@ using FirebaseAdmin;
 using FirebaseAdmin.Messaging;
 using Google.Apis.Auth.OAuth2;
 using Hangfire;
+using Hangfire.PostgreSql;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -45,7 +46,8 @@ public static class DependencyInjection
         services.AddSingleton<ISendGridClient>(_ => new SendGridClient(configuration["SendGrid:ApiKey"]));
 
         services.AddHangfire(config => config
-            .UsePostgreSqlStorage(configuration.GetConnectionString("DefaultConnection")));
+            .UsePostgreSqlStorage(options =>
+                options.UseNpgsqlConnection(configuration.GetConnectionString("DefaultConnection"))));
         services.AddHangfireServer();
 
         return services;
