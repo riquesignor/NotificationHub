@@ -71,6 +71,13 @@ src/NotificationService.API/firebase-key.json
 export SendGrid__ApiKey="SG.xxxxxxxxxxxx"
 ```
 
+Prefira `dotnet user-secrets` a colocar chaves reais em
+`appsettings.Development.json` (detalhes em
+[docs/deployment.md](docs/deployment.md)). Em produção, o Firebase pode ser
+configurado via `Firebase__CredentialsJson` (JSON em uma variável de
+ambiente) em vez do arquivo — necessário em hosts sem filesystem
+persistente.
+
 ### 4. Banco de dados
 
 Ainda não há migrations geradas (dependem do SDK instalado). Depois de
@@ -98,6 +105,13 @@ dotnet run
 ```bash
 dotnet test
 ```
+
+## Deploy
+
+Guia completo (comparação de hosts grátis, passo a passo no Railway,
+variáveis de ambiente necessárias) em
+[docs/deployment.md](docs/deployment.md). Já tem [Dockerfile](Dockerfile)
+na raiz pronto pro build em container.
 
 ## Status desta versão
 

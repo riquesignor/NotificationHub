@@ -1,0 +1,11 @@
+**/bin/
+**/obj/
+.git/
+.vs/
+.idea/
+tests/
+*.user
+firebase-key.json
+appsettings.Development.json
+README.md
+docs/

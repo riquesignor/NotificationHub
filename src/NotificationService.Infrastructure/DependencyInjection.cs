@@ -29,11 +29,16 @@ public static class DependencyInjection
 
         if (FirebaseApp.DefaultInstance is null)
         {
-            var credentialsPath = configuration["Firebase:CredentialsPath"] ?? "firebase-key.json";
-            FirebaseApp.Create(new AppOptions
-            {
-                Credential = GoogleCredential.FromFile(credentialsPath)
-            });
+            // Em produção (Railway, etc.) não há como "colocar" um arquivo no
+            // container com segurança: a credencial vem via variável de
+            // ambiente Firebase__CredentialsJson (conteúdo do JSON da service
+            // account, em uma linha só). Em dev local, cai pro arquivo.
+            var credentialsJson = configuration["Firebase:CredentialsJson"];
+            var credential = !string.IsNullOrWhiteSpace(credentialsJson)
+                ? GoogleCredential.FromJson(credentialsJson)
+                : GoogleCredential.FromFile(configuration["Firebase:CredentialsPath"] ?? "firebase-key.json");
+
+            FirebaseApp.Create(new AppOptions { Credential = credential });
         }
         services.AddSingleton(_ => FirebaseMessaging.DefaultInstance);
 
