@@ -1,0 +1,18 @@
+## .NET
+bin/
+obj/
+*.user
+.vs/
+
+## Rider / VS Code
+.idea/
+*.suo
+
+## Segredos e credenciais - nunca commitar
+firebase-key.json
+appsettings.*.local.json
+.env
+
+## Testes
+*.trx
+coverage/
