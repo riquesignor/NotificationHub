@@ -43,26 +43,22 @@ conteúdo, só preciso saber que você configurou:
 |---|---|---|
 | `ASPNETCORE_ENVIRONMENT` | ambiente | fixo: `Production` |
 | `ConnectionStrings__DefaultConnection` | string de conexão do Postgres | gerada automaticamente pelo add-on PostgreSQL do Railway (copie do painel dele) |
-| `Firebase__CredentialsJson` | JSON da service account do Firebase, em uma linha só | Firebase Console → ⚙️ Configurações do projeto → Contas de serviço → **Gerar nova chave privada** |
-| `SendGrid__ApiKey` | API key do SendGrid | SendGrid → Settings → API Keys → Create API Key |
+| `SendGrid__ApiKey` | API key do SendGrid (só se for usar o canal de email) | SendGrid → Settings → API Keys → Create API Key |
 | `SendGrid__FromEmail` | email remetente | precisa estar verificado no SendGrid (Sender Authentication) |
 | `SendGrid__FromName` | nome exibido no remetente | à sua escolha, ex. `NotificationHub` |
 
-Notas:
-- `Firebase__CredentialsJson` existe porque em produção não dá pra "colocar"
-  o arquivo `firebase-key.json` no container com segurança — a variável
-  `Firebase:CredentialsJson` já é lida em
-  [`DependencyInjection.cs`](../src/NotificationService.Infrastructure/DependencyInjection.cs)
-  como alternativa ao arquivo (que continua funcionando só em dev local).
-- Localmente, prefira `dotnet user-secrets` em vez de editar
-  `appsettings.Development.json` com chaves reais, pra não correr risco de
-  commitar por engano:
-  ```bash
-  cd src/NotificationService.API
-  dotnet user-secrets init
-  dotnet user-secrets set "SendGrid:ApiKey" "SG.xxxx"
-  dotnet user-secrets set "Firebase:CredentialsJson" "$(cat firebase-key.json)"
-  ```
+Push não entra nessa tabela: vai pela [Expo Push
+API](https://docs.expo.dev/push-notifications/sending-notifications/), que
+não pede credencial nenhuma (sem conta, sem chave).
+
+Nota: localmente, prefira `dotnet user-secrets` em vez de editar
+`appsettings.Development.json` com chaves reais, pra não correr risco de
+commitar por engano:
+```bash
+cd src/NotificationService.API
+dotnet user-secrets init
+dotnet user-secrets set "SendGrid:ApiKey" "SG.xxxx"
+```
 
 ## Telegram Bot API (mencionado, ainda não implementado)
 
@@ -73,13 +69,15 @@ esse canal agora pra não adicionar funcionalidade sem confirmação; se
 quiser, é um `Channel.Telegram` + `ITelegramNotificationService` novo,
 seguindo o mesmo padrão do `EmailNotificationService`.
 
-## Integração com apps consumidoras (ex.: um backend de chat)
+## Integração com apps consumidoras
 
-Qualquer backend externo consome o NotificationHub só por HTTP, usando a
-URL pública do deploy:
+Qualquer app consome o NotificationHub só por HTTP, usando a URL pública
+do deploy. `userId` é sempre string — qualquer id externo serve (UID do
+Firebase Auth, id de outro provedor, etc.), não precisa ser Guid:
 
 - `POST {URL}/api/devices/register` — registra o token de push do usuário
-  ao fazer login no app cliente.
+  ao fazer login no app cliente. Para apps Expo, `token` é o valor de
+  `getExpoPushTokenAsync()` (formato `ExponentPushToken[...]`).
 - `POST {URL}/api/notifications/send` — envia notificação (canal primário +
   fallbacks).
 - `GET {URL}/api/notifications/{id}/status` — status e logs das tentativas.
@@ -88,3 +86,12 @@ Os contratos completos (body de cada request) estão na tabela de Endpoints
 do [README.md](../README.md#endpoints) principal. O NotificationHub não
 guarda lógica de autenticação de outros apps — se a app consumidora exigir
 isso, é ela que decide antes de chamar o NotificationHub.
+
+Quando o app consumidor não tem backend próprio (caso do Symbius: é só
+React Native + Firebase, sem servidor HTTP dele), quem chama
+`/api/notifications/send` é o próprio cliente, direto do dispositivo de
+quem está enviando a mensagem/ação — o que importa é que essa chamada
+HTTP aconteça a partir de um processo que já está rodando (o remetente,
+que está com o app aberto), não do destinatário (que pode estar com o
+app fechado). O push então chega no destinatário via Expo/FCM
+independente do app dele estar aberto ou não.

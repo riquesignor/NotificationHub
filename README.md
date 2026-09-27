@@ -5,9 +5,12 @@ automático, fallback inteligente e rastreamento de delivery. Projetado para
 ser integrado em qualquer aplicação (web, mobile, backend).
 
 **Stack**: C# / .NET 8 · ASP.NET Core Web API · EF Core (PostgreSQL) ·
-Firebase Cloud Messaging (push) · SendGrid (email) · Hangfire (jobs)
+Expo Push API (push) · SendGrid (email) · Hangfire (jobs)
 
 Só usa serviços com tier gratuito — por isso não há canal de SMS/Twilio.
+Push é via [Expo Push API](https://docs.expo.dev/push-notifications/sending-notifications/)
+(sem credencial nenhuma) porque os apps consumidores até agora usam Expo,
+que gera `ExponentPushToken[...]` e não token nativo de FCM.
 
 ## Como funciona
 
@@ -29,7 +32,7 @@ NotificationHub/
 │   ├── NotificationService.API/            → controllers, Program.cs, config
 │   ├── NotificationService.Application/    → orquestração, serviços de envio, jobs, validação
 │   ├── NotificationService.Domain/         → entidades, enums, contratos de repositório
-│   └── NotificationService.Infrastructure/ → EF Core, repositórios, DI de Firebase/SendGrid/Hangfire
+│   └── NotificationService.Infrastructure/ → EF Core, repositórios, DI de SendGrid/Hangfire
 └── tests/
     └── NotificationService.Tests/          → testes do orquestrador (xUnit + Moq)
 ```
@@ -48,11 +51,11 @@ NotificationHub/
 
 ### 1. Pré-requisitos
 
-- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) — **não
-  está instalado nesta máquina**, instale antes de restaurar/buildar.
+- [.NET 8 SDK](https://dotnet.microsoft.com/download/dotnet/8.0) — já
+  instalado nesta máquina em `~/.dotnet` (via `dotnet-install.sh`, sem apt).
 - PostgreSQL rodando localmente (ou ajuste a connection string).
-- Projeto no Firebase com Cloud Messaging habilitado.
-- Conta SendGrid (tier free cobre o volume de um projeto pessoal).
+- Conta SendGrid (tier free cobre o volume de um projeto pessoal) — só se
+  for usar o canal de email; push não pede nenhuma credencial.
 
 ### 2. Restaurar e buildar
 
@@ -63,20 +66,16 @@ dotnet build
 
 ### 3. Credenciais
 
-```bash
-# Firebase: baixe a service account key no Console e salve como:
-src/NotificationService.API/firebase-key.json
+Push (Expo) não precisa de nenhuma credencial. Só o canal de email pede
+uma:
 
-# SendGrid: exporte a API key (ou edite appsettings.Development.json)
+```bash
 export SendGrid__ApiKey="SG.xxxxxxxxxxxx"
 ```
 
 Prefira `dotnet user-secrets` a colocar chaves reais em
 `appsettings.Development.json` (detalhes em
-[docs/deployment.md](docs/deployment.md)). Em produção, o Firebase pode ser
-configurado via `Firebase__CredentialsJson` (JSON em uma variável de
-ambiente) em vez do arquivo — necessário em hosts sem filesystem
-persistente.
+[docs/deployment.md](docs/deployment.md)).
 
 ### 4. Banco de dados
 
@@ -115,17 +114,17 @@ na raiz pronto pro build em container.
 
 ## Status desta versão
 
-Este é o esqueleto inicial gerado a partir da especificação técnica do
-projeto (entidades, orquestrador com fallback, serviços de Push/Email,
-job de retry, controllers e testes unitários do orquestrador).
+Build e testes (`dotnet build` + `dotnet test`) passam limpos, 0 erros/
+avisos. `dotnet run` sobe até faltar um Postgres real pra conectar — ou
+seja, toda a injeção de dependência, EF Core e Hangfire estão corretos; só
+falta infraestrutura externa (banco) pra rodar de ponta a ponta.
 
-**Ainda não validado com `dotnet build`/`dotnet restore`** porque o SDK do
-.NET não está instalado nesta máquina — instale o SDK e rode os comandos
-acima para confirmar que compila. Os nomes de pacotes NuGet (versões do
-EF Core, FirebaseAdmin, SendGrid, Hangfire, FluentValidation, xUnit) foram
-escolhidos com base em versões estáveis conhecidas para .NET 8, mas o
-`dotnet restore` pode pedir ajuste fino se alguma tiver saído de linha.
+Integrado com o [Symbius](../Symbius) (app do TCC): `UserId` é string
+(compatível com UID do Firebase Auth) e o push vai pela Expo Push API
+(compatível com `ExponentPushToken[...]`).
 
 Pendências para próximas versões: migrations do EF Core, seed de
-templates, testes de integração dos controllers, e (se algum dia precisar)
-autenticação da API.
+templates, testes de integração dos controllers, endpoint pra
+registrar/atualizar email do usuário (hoje o fallback de email só funciona
+se algo popular a tabela `Users`), e (se algum dia precisar) autenticação
+da API.
