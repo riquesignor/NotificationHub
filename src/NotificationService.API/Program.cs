@@ -26,10 +26,17 @@ builder.Services.AddCors(options =>
 
 var app = builder.Build();
 
-RecurringJob.AddOrUpdate<RetryFailedNotificationsJob>(
-    "retry-failed-notifications",
-    job => job.Execute(),
-    Cron.Hourly);
+// API baseada em serviço (IRecurringJobManager) em vez da estática
+// RecurringJob.AddOrUpdate — a estática depende de JobStorage.Current
+// já resolvido no momento da chamada, e essa ordem não é garantida.
+using (var scope = app.Services.CreateScope())
+{
+    var recurringJobManager = scope.ServiceProvider.GetRequiredService<IRecurringJobManager>();
+    recurringJobManager.AddOrUpdate<RetryFailedNotificationsJob>(
+        "retry-failed-notifications",
+        job => job.Execute(),
+        Cron.Hourly);
+}
 
 if (app.Environment.IsDevelopment())
 {

@@ -5,7 +5,7 @@ namespace NotificationService.Domain.Entities;
 public class DeviceToken
 {
     public Guid Id { get; set; }
-    public Guid UserId { get; set; }
+    public string UserId { get; set; } = string.Empty;
     public string Token { get; set; } = string.Empty;
     public DeviceType DeviceType { get; set; }
     public string? DeviceName { get; set; }

@@ -37,7 +37,7 @@ public class NotificationOrchestratorTests
 
         var request = new NotificationRequest
         {
-            UserId = Guid.NewGuid(),
+            UserId = "user-1",
             Title = "Title",
             Message = "Message",
             PrimaryChannel = Channel.Push
@@ -60,7 +60,7 @@ public class NotificationOrchestratorTests
 
         var request = new NotificationRequest
         {
-            UserId = Guid.NewGuid(),
+            UserId = "user-2",
             Title = "Title",
             Message = "Message",
             PrimaryChannel = Channel.Push,

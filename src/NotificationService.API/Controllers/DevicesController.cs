@@ -16,7 +16,7 @@ public class DevicesController : ControllerBase
         _deviceTokenRepository = deviceTokenRepository;
     }
 
-    public record RegisterDeviceRequest(Guid UserId, string Token, DeviceType DeviceType, string? DeviceName);
+    public record RegisterDeviceRequest(string UserId, string Token, DeviceType DeviceType, string? DeviceName);
 
     [HttpPost("register")]
     public async Task<IActionResult> Register(RegisterDeviceRequest request)

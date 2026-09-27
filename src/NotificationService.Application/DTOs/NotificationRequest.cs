@@ -4,7 +4,7 @@ namespace NotificationService.Application.DTOs;
 
 public record NotificationRequest
 {
-    public Guid UserId { get; init; }
+    public string UserId { get; init; } = string.Empty;
     public string Title { get; init; } = string.Empty;
     public string Message { get; init; } = string.Empty;
     public string? ImageUrl { get; init; }

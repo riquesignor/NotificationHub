@@ -11,14 +11,14 @@ namespace NotificationService.Application.Services;
 public class EmailNotificationService : IEmailNotificationService
 {
     private readonly ISendGridClient _sendGridClient;
-    private readonly IRepository<User> _userRepo;
+    private readonly IUserRepository _userRepo;
     private readonly ILogger<EmailNotificationService> _logger;
     private readonly string _fromEmail;
     private readonly string _fromName;
 
     public EmailNotificationService(
         ISendGridClient sendGridClient,
-        IRepository<User> userRepo,
+        IUserRepository userRepo,
         ILogger<EmailNotificationService> logger,
         IConfiguration configuration)
     {

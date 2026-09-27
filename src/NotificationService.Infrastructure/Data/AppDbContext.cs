@@ -19,6 +19,13 @@ public class AppDbContext : DbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        // User.Id é uma string externa (ex.: UID do Firebase Auth) sem
+        // garantia de existir localmente — sem FK real com Notification/DeviceToken.
+        modelBuilder.Entity<Notification>().Ignore(n => n.User);
+        modelBuilder.Entity<DeviceToken>().Ignore(d => d.User);
+        modelBuilder.Entity<User>().Ignore(u => u.Notifications);
+        modelBuilder.Entity<User>().Ignore(u => u.DeviceTokens);
+
         modelBuilder.Entity<Notification>(entity =>
         {
             entity.Property(n => n.PrimaryChannel).HasConversion<string>();
