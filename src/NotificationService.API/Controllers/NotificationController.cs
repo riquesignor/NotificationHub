@@ -1,13 +1,16 @@
 using FluentValidation;
 using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
+using NotificationService.API.Security;
 using NotificationService.Application.DTOs;
+using NotificationService.Application.Security;
 using NotificationService.Application.Services;
 
 namespace NotificationService.API.Controllers;
 
 [ApiController]
 [Route("api/notifications")]
+[ApiKeyAuth(ApiKeyScope.Secret)]
 public class NotificationController : ControllerBase
 {
     private readonly INotificationService _notificationService;
@@ -33,7 +36,7 @@ public class NotificationController : ControllerBase
             return ValidationErrors(validation);
         }
 
-        var result = await _notificationService.SendAsync(request);
+        var result = await _notificationService.SendAsync(HttpContext.GetClientApp().Id, request);
         return Ok(result);
     }
 
@@ -46,14 +49,14 @@ public class NotificationController : ControllerBase
             return ValidationErrors(validation);
         }
 
-        var result = await _notificationService.SendFromTemplateAsync(request);
+        var result = await _notificationService.SendFromTemplateAsync(HttpContext.GetClientApp().Id, request);
         return Ok(result);
     }
 
     [HttpGet("{id:guid}/status")]
     public async Task<IActionResult> GetStatus(Guid id)
     {
-        var status = await _notificationService.GetStatusAsync(id);
+        var status = await _notificationService.GetStatusAsync(HttpContext.GetClientApp().Id, id);
         if (status is null)
         {
             return NotFound();

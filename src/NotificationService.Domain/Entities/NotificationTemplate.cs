@@ -5,6 +5,7 @@ namespace NotificationService.Domain.Entities;
 public class NotificationTemplate
 {
     public Guid Id { get; set; }
+    public string AppId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;
     public string TitleTemplate { get; set; } = string.Empty;
     public string MessageTemplate { get; set; } = string.Empty;

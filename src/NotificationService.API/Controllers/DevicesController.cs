@@ -1,7 +1,10 @@
+using FluentValidation;
+using FluentValidation.Results;
 using Microsoft.AspNetCore.Mvc;
-using NotificationService.Domain.Entities;
-using NotificationService.Domain.Enums;
-using NotificationService.Domain.Repositories;
+using NotificationService.API.Security;
+using NotificationService.Application.DTOs;
+using NotificationService.Application.Security;
+using NotificationService.Application.Services;
 
 namespace NotificationService.API.Controllers;
 
@@ -9,45 +12,88 @@ namespace NotificationService.API.Controllers;
 [Route("api/devices")]
 public class DevicesController : ControllerBase
 {
-    private readonly IRepository<DeviceToken> _deviceTokenRepository;
+    private readonly IDeviceService _deviceService;
+    private readonly IValidator<RegisterDeviceRequest> _registerValidator;
+    private readonly IValidator<UnregisterDeviceRequest> _unregisterValidator;
 
-    public DevicesController(IRepository<DeviceToken> deviceTokenRepository)
+    public DevicesController(
+        IDeviceService deviceService,
+        IValidator<RegisterDeviceRequest> registerValidator,
+        IValidator<UnregisterDeviceRequest> unregisterValidator)
     {
-        _deviceTokenRepository = deviceTokenRepository;
+        _deviceService = deviceService;
+        _registerValidator = registerValidator;
+        _unregisterValidator = unregisterValidator;
     }
 
-    public record RegisterDeviceRequest(string UserId, string Token, DeviceType DeviceType, string? DeviceName);
-
+    // Chave pública basta: é chamado direto do app no aparelho.
     [HttpPost("register")]
+    [ApiKeyAuth(ApiKeyScope.Public)]
     public async Task<IActionResult> Register(RegisterDeviceRequest request)
     {
-        var existing = (await _deviceTokenRepository.GetAsync(
-            d => d.UserId == request.UserId && d.Token == request.Token)).FirstOrDefault();
-
-        if (existing is not null)
+        var validation = await _registerValidator.ValidateAsync(request);
+        if (!validation.IsValid)
         {
-            existing.IsActive = true;
-            existing.LastUsedAt = DateTime.UtcNow;
-            existing.DeviceName = request.DeviceName;
-            await _deviceTokenRepository.UpdateAsync(existing);
-            await _deviceTokenRepository.SaveChangesAsync();
-            return Ok(existing);
+            return ValidationErrors(validation);
         }
 
-        var deviceToken = new DeviceToken
+        var device = await _deviceService.RegisterAsync(HttpContext.GetClientApp().Id, request);
+        return Ok(new
         {
-            Id = Guid.NewGuid(),
-            UserId = request.UserId,
-            Token = request.Token,
-            DeviceType = request.DeviceType,
-            DeviceName = request.DeviceName,
-            IsActive = true,
-            RegisteredAt = DateTime.UtcNow
-        };
+            id = device.Id,
+            userId = device.UserId,
+            deviceType = device.DeviceType,
+            deviceName = device.DeviceName,
+            attributes = device.Attributes,
+            isActive = device.IsActive,
+            registeredAt = device.RegisteredAt,
+            lastUsedAt = device.LastUsedAt
+        });
+    }
 
-        await _deviceTokenRepository.AddAsync(deviceToken);
-        await _deviceTokenRepository.SaveChangesAsync();
+    // Ex.: usuário desligou as notificações ou saiu da conta.
+    [HttpPost("unregister")]
+    [ApiKeyAuth(ApiKeyScope.Public)]
+    public async Task<IActionResult> Unregister(UnregisterDeviceRequest request)
+    {
+        var validation = await _unregisterValidator.ValidateAsync(request);
+        if (!validation.IsValid)
+        {
+            return ValidationErrors(validation);
+        }
 
-        return Ok(deviceToken);
+        var removed = await _deviceService.UnregisterAsync(HttpContext.GetClientApp().Id, request.Token);
+        return removed ? NoContent() : NotFound();
+    }
+
+    /// <summary>
+    /// Lista aparelhos ativos da app. Filtros: ?userId=...&amp;attr[chave]=valor
+    /// (igualdade exata, todos precisam bater) e paginação ?page=&amp;pageSize= (máx. 500).
+    /// </summary>
+    [HttpGet]
+    [ApiKeyAuth(ApiKeyScope.Secret)]
+    public async Task<IActionResult> List(
+        [FromQuery] string? userId,
+        [FromQuery(Name = "attr")] Dictionary<string, string>? attributes,
+        [FromQuery] int page = 1,
+        [FromQuery] int pageSize = 100)
+    {
+        var result = await _deviceService.ListAsync(HttpContext.GetClientApp().Id, new DeviceQuery
+        {
+            UserId = userId,
+            Attributes = attributes ?? new Dictionary<string, string>(),
+            Page = page,
+            PageSize = pageSize
+        });
+        return Ok(result);
+    }
+
+    private IActionResult ValidationErrors(ValidationResult validation)
+    {
+        var errors = validation.Errors
+            .GroupBy(e => e.PropertyName)
+            .ToDictionary(g => g.Key, g => g.Select(e => e.ErrorMessage).ToArray());
+
+        return ValidationProblem(new ValidationProblemDetails(errors));
     }
 }

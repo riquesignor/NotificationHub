@@ -23,6 +23,7 @@ public static class DependencyInjection
         services.AddScoped<IUserRepository, UserRepository>();
 
         services.AddScoped<INotificationService, NotificationOrchestrator>();
+        services.AddScoped<IDeviceService, DeviceService>();
         services.AddHttpClient<IPushNotificationService, PushNotificationService>();
         services.AddScoped<IEmailNotificationService, EmailNotificationService>();
 

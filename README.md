@@ -14,14 +14,18 @@ que gera `ExponentPushToken[...]` e não token nativo de FCM.
 
 ## Como funciona
 
-1. Uma app manda `POST /api/notifications/send` com canal primário e
-   fallbacks.
+1. Uma app (identificada pela sua chave de API) manda
+   `POST /api/notifications/send` com canal primário e fallbacks. Se a
+   `idempotencyKey` já foi usada por essa app, nada é reenviado.
 2. O `NotificationOrchestrator` tenta o canal primário (normalmente Push);
    se falhar, cai pro próximo da lista (Email).
 3. Cada tentativa é registrada em `NotificationLog` com status, mensagem de
    erro e id retornado pelo provider.
 4. Um job do Hangfire (`RetryFailedNotificationsJob`) roda a cada hora e
-   reprocessa notificações com status `Failed` e menos de 3 tentativas.
+   reentrega (a mesma notificação, sem criar cópia) as que estão `Failed`
+   com menos de 3 tentativas.
+5. Tokens que a Expo responde como `DeviceNotRegistered` (app desinstalado)
+   são desativados automaticamente.
 
 ## Estrutura
 
@@ -34,18 +38,72 @@ NotificationHub/
 │   ├── NotificationService.Domain/         → entidades, enums, contratos de repositório
 │   └── NotificationService.Infrastructure/ → EF Core, repositórios, DI de SendGrid/Hangfire
 └── tests/
-    └── NotificationService.Tests/          → testes do orquestrador (xUnit + Moq)
+    └── NotificationService.Tests/          → xUnit + Moq: orquestrador, push, aparelhos, chaves, modelo EF
 ```
 
 ## Endpoints
 
-| Método | Rota | Descrição |
-| --- | --- | --- |
-| `POST` | `/api/notifications/send` | Envia notificação (canal primário + fallbacks) |
-| `POST` | `/api/notifications/send-template` | Envia usando um template salvo |
-| `GET` | `/api/notifications/{id}/status` | Status + logs de tentativas |
-| `GET` | `/api/templates` | Lista templates cadastrados |
-| `POST` | `/api/devices/register` | Registra/atualiza device token para push |
+| Método | Rota | Chave | Descrição |
+| --- | --- | --- | --- |
+| `POST` | `/api/notifications/send` | secreta | Envia notificação (canal primário + fallbacks) |
+| `POST` | `/api/notifications/send-template` | secreta | Envia usando um template salvo |
+| `GET` | `/api/notifications/{id}/status` | secreta | Status + logs de tentativas |
+| `GET` | `/api/templates` | secreta | Lista templates da app |
+| `POST` | `/api/devices/register` | pública | Registra/atualiza o aparelho (token + atributos) |
+| `POST` | `/api/devices/unregister` | pública | Desativa o aparelho (ex.: usuário desligou notificações) |
+| `GET` | `/api/devices` | secreta | Lista aparelhos ativos, com filtro `?userId=` e `?attr[chave]=valor` |
+
+### Apps e chaves de API
+
+Cada app consumidora é cadastrada na seção `ClientApps` da configuração
+com um `Id` e **duas chaves**, enviadas no header `X-Api-Key`:
+
+- **Pública**: pode ir embutida no app do celular. Só registra ou remove
+  o próprio aparelho.
+- **Secreta**: só em servidor, job ou backend. Envia notificações e lista
+  aparelhos.
+
+Tudo (aparelhos, notificações, templates, chaves de idempotência) é
+separado por app: uma app nunca vê nem notifica os usuários de outra.
+
+```json
+"ClientApps": [
+  { "Id": "meu-app", "Name": "Meu App", "PublicKey": "<aleatória>", "SecretKey": "<outra aleatória>" }
+]
+```
+
+**Modo legado:** se nenhuma app estiver cadastrada, a API funciona sem
+chave (como nas versões anteriores) e loga um aviso na inicialização. Serve
+para não quebrar consumidoras antigas; não exponha o hub publicamente assim.
+
+> Com a chave pública, um app pode registrar um token sob qualquer
+> `userId`. Para apps com login, prefira que o **backend** da app registre
+> o aparelho com a chave secreta. Para apps sem login, use um id aleatório
+> por instalação (UUID), que não dá para adivinhar.
+
+### Recursos do envio
+
+```json
+{
+  "userId": "user-123",
+  "title": "Pedido enviado",
+  "message": "Seu pedido saiu para entrega",
+  "primaryChannel": "push",
+  "fallbackChannels": ["email"],
+  "data": { "route": "/pedidos/42" },
+  "idempotencyKey": "pedido-42-enviado",
+  "push": { "priority": "high", "channelId": "pedidos", "ttlSeconds": 3600 }
+}
+```
+
+- `idempotencyKey` (opcional): repetir o envio com a mesma chave devolve a
+  notificação original (`duplicate: true`) sem reenviar. Ideal para jobs
+  que reavaliam a mesma condição de tempos em tempos.
+- `push` (opcional): prioridade, canal do Android e por quanto tempo tentar
+  entregar se o aparelho estiver offline (repassados à Expo Push API).
+- Atributos do aparelho (`attributes` no registro) são chave-valor livres
+  (ex.: idioma, região, preferências). O hub não interpreta, só guarda e
+  permite filtrar em `GET /api/devices`.
 
 ## Setup local
 
@@ -123,8 +181,13 @@ Integrado com o [Symbius](../Symbius) (app do TCC): `UserId` é string
 (compatível com UID do Firebase Auth) e o push vai pela Expo Push API
 (compatível com `ExponentPushToken[...]`).
 
+Integrado também com o Sereno (app de clima): o app registra o aparelho
+com atributos (localização e preferências de alerta) e um job agendado
+lista os aparelhos, avalia a previsão e envia com `idempotencyKey`.
+
 Pendências para próximas versões: migrations do EF Core, seed de
-templates, testes de integração dos controllers, endpoint pra
-registrar/atualizar email do usuário (hoje o fallback de email só funciona
-se algo popular a tabela `Users`), e (se algum dia precisar) autenticação
-da API.
+templates, testes de integração dos controllers (precisam de Postgres),
+endpoint pra registrar/atualizar email do usuário (hoje o fallback de email
+só funciona se algo popular a tabela `Users`), filtro de atributos no banco
+(jsonb + índice GIN; hoje é em memória) e consulta dos *receipts* da Expo
+para preencher o status `Delivered`.

@@ -11,9 +11,9 @@ public class TemplateRepository : Repository<NotificationTemplate>, ITemplateRep
     {
     }
 
-    public Task<NotificationTemplate?> GetByNameAsync(string name)
-        => DbSet.FirstOrDefaultAsync(t => t.Name == name);
+    public Task<NotificationTemplate?> GetByNameAsync(string appId, string name)
+        => DbSet.FirstOrDefaultAsync(t => t.AppId == appId && t.Name == name);
 
-    public async Task<IEnumerable<NotificationTemplate>> GetAllAsync()
-        => await DbSet.ToListAsync();
+    public async Task<IEnumerable<NotificationTemplate>> GetAllAsync(string appId)
+        => await DbSet.Where(t => t.AppId == appId).ToListAsync();
 }

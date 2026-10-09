@@ -46,6 +46,14 @@ conteúdo, só preciso saber que você configurou:
 | `SendGrid__ApiKey` | API key do SendGrid (só se for usar o canal de email) | SendGrid → Settings → API Keys → Create API Key |
 | `SendGrid__FromEmail` | email remetente | precisa estar verificado no SendGrid (Sender Authentication) |
 | `SendGrid__FromName` | nome exibido no remetente | à sua escolha, ex. `NotificationHub` |
+| `ClientApps__0__Id` | id da 1ª app consumidora | à sua escolha, ex. `sereno` |
+| `ClientApps__0__Name` | nome legível (opcional) | ex. `Sereno` |
+| `ClientApps__0__PublicKey` | chave pública (vai no app) | gere uma aleatória, ex. `openssl rand -hex 24` |
+| `ClientApps__0__SecretKey` | chave secreta (só servidor/job) | outra aleatória, diferente da pública |
+
+Para mais apps, repita com `ClientApps__1__...`, `ClientApps__2__...`. Sem
+nenhuma `ClientApps` o hub roda em **modo legado, sem autenticação**: só
+para desenvolvimento ou para consumidoras antigas durante a migração.
 
 Push não entra nessa tabela: vai pela [Expo Push
 API](https://docs.expo.dev/push-notifications/sending-notifications/), que
@@ -83,9 +91,17 @@ Firebase Auth, id de outro provedor, etc.), não precisa ser Guid:
 - `GET {URL}/api/notifications/{id}/status` — status e logs das tentativas.
 
 Os contratos completos (body de cada request) estão na tabela de Endpoints
-do [README.md](../README.md#endpoints) principal. O NotificationHub não
-guarda lógica de autenticação de outros apps — se a app consumidora exigir
-isso, é ela que decide antes de chamar o NotificationHub.
+do [README.md](../README.md#endpoints) principal. O NotificationHub
+autentica a **app** (header `X-Api-Key`), não o usuário final: se a app
+consumidora tem login, é ela que decide quem pode notificar quem antes de
+chamar o NotificationHub.
+
+**Migrando uma consumidora antiga (sem chave):** cadastre a app em
+`ClientApps`, passe a enviar `X-Api-Key` e só então publique o hub com a
+lista preenchida, porque a partir daí as chamadas sem chave recebem 401.
+Atenção: a chave **secreta** não deve ficar dentro do app do celular. Se
+hoje o próprio app chama `/send` (caso do Symbius), o ideal é mover essa
+chamada para um backend ou função serverless.
 
 Quando o app consumidor não tem backend próprio (caso do Symbius: é só
 React Native + Firebase, sem servidor HTTP dele), quem chama

@@ -1,10 +1,13 @@
 using Microsoft.AspNetCore.Mvc;
+using NotificationService.API.Security;
+using NotificationService.Application.Security;
 using NotificationService.Domain.Repositories;
 
 namespace NotificationService.API.Controllers;
 
 [ApiController]
 [Route("api/templates")]
+[ApiKeyAuth(ApiKeyScope.Secret)]
 public class TemplateController : ControllerBase
 {
     private readonly ITemplateRepository _templateRepository;
@@ -17,7 +20,7 @@ public class TemplateController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        var templates = await _templateRepository.GetAllAsync();
+        var templates = await _templateRepository.GetAllAsync(HttpContext.GetClientApp().Id);
         return Ok(templates.Select(t => new
         {
             id = t.Id,
